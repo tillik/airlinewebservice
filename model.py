@@ -2,10 +2,12 @@ from flask import Flask
 from marshmallow import Schema, fields, pre_load, validate
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
+from flask_security import UserMixin, RoleMixin, login_required
 from sqlalchemy import PrimaryKeyConstraint
 from sqlalchemy import UniqueConstraint
 from sqlalchemy import CheckConstraint
 from enum import Enum
+from passlib.apps import custom_app_context as pwd_context
 
 # https://www.sqlalchemy.org/
 # https://github.com/zzzeek/sqlalchemy
@@ -118,3 +120,55 @@ class FlightSchema(ma.Schema):
     start = fields.String()
     end = fields.String()
     date = fields.DateTime()
+
+# Create a table to support a many-to-many relationship between Users and Roles
+roles_users = db.Table(
+    'roles_users',
+    db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
+    db.Column('role_id', db.Integer(), db.ForeignKey('role.id'))
+)
+
+class Role(db.Model, RoleMixin):
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(80), unique=True)
+    description = db.Column(db.String(255))
+
+     # __str__ is required by Flask-Admin, so we can have human-readable values for the Role when editing a User.
+    def __str__(self):
+        return self.name
+
+    # __hash__ is required to avoid the exception TypeError: unhashable type: 'Role' when saving a User
+    def __hash__(self):
+        return hash(self.name)
+
+class RoleSchema(ma.Schema):
+    id = fields.Int()
+    name = fields.String(required=True, validate=validate.Length(1))
+    description = fields.String()
+   
+class User(db.Model, UserMixin):
+    __tablename__ = 'user'
+
+    # the User has six fields: ID, email, password, active, confirmed_at and roles. The roles field represents a
+    # many-to-many relationship using the roles_users table. Each user may have no role, one role, or multiple roles.
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True)
+    password = db.Column(db.String(255))
+    active = db.Column(db.Boolean())
+    confirmed_at = db.Column(db.DateTime())
+    roles = db.relationship(
+        'Role',
+        secondary=roles_users,
+        backref=db.backref('users', lazy='dynamic')
+    )
+    def hash_password(self, password):
+        self.password_hash = pwd_context.encrypt(password)
+
+    def verify_password(self, password):
+        return pwd_context.verify(password, self.password_hash)
+
+class UserSchema(ma.Schema):
+    id = fields.Int()
+    email = fields.String(required=True, validate=validate.Length(1))
+    password = fields.String(required=True, validate=validate.Length(1))
+    roles = fields.String() 
