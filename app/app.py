@@ -1,7 +1,10 @@
+import os
+
 from flask import Flask, Blueprint, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required, utils
 from flask_restful import Api
+from flask_migrate import Migrate
 from model import User, Role
 from resources.Welcome import Welcome
 from resources.Flight import FlightResource
@@ -9,10 +12,29 @@ from resources.Aircraft import AircraftResource
 from resources.Ticket import TicketResource
 from resources.Seat import SeatResource
 from resources.User import UserResource
+from model import db, User, Role
+
+database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}'.format(
+    dbuser=os.environ['DBUSER'],
+    dbpass=os.environ['DBPASS'],
+    dbhost=os.environ['DBHOST'],
+    dbname=os.environ['DBNAME']
+)
 
 app = Flask(__name__)
-app.config.from_object("config")
-    
+
+# app.config.from_object("config")
+
+app.config.update(
+    SQLALCHEMY_DATABASE_URI=database_uri,
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+)
+
+db.init_app(app)
+
+# initialize database migration management
+migrate = Migrate(app, db)
+
 #https://stackoverflow.com/questions/24420857/what-are-flask-blueprints-exactly
 #from app import api_bp
     
@@ -30,8 +52,7 @@ api.add_resource(AircraftResource, '/aircraft')
 api.add_resource(SeatResource, '/seat')
 api.add_resource(UserResource, '/user')
 
-from model import db, User, Role
-db.init_app(app)
+
 
 # Replace this with your own secret key
 app.config['SECRET_KEY'] = 'super-secret'
@@ -89,12 +110,12 @@ def before_first_request():
 def index():
     return render_template('index.html')
 
-if __name__ == "__main__":
-    #app.run(debug=True)
-
-    # listen on all ips
-    app.run(
-        host='0.0.0.0',
-        port=int('8080'),
-        debug=app.config['DEBUG']
-    )
+#if __name__ == "__main__":
+#    #app.run(debug=True)
+#
+#    # listen on all ips
+#    app.run(
+#        host='0.0.0.0',
+#        port=int('8080'),
+#        debug=app.config['DEBUG']
+#    )
