@@ -1,5 +1,6 @@
-from flask import request
+from flask import request, json,jsonify
 from flask_restful import Resource
+from flask_security import login_required
 from model import db, Aircraft, AircraftSchema, Flight, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
 from marshmallow import ValidationError
 
@@ -7,10 +8,18 @@ aircrafts_schema = AircraftSchema(many=True)
 aircraft_schema = AircraftSchema()
 
 class AircraftResource(Resource):
+    
+    # Get all aircrafts
+    @login_required
     def get(self):
-        return {}, 200
+        aircrafts = Aircraft.query.all()
+        result = aircraft_schema.dump(aircrafts)
+        response = jsonify(result)
+        response.status_code = 200
+        return response
 
-    # create an aircraft
+    # Create an aircraft
+    @login_required
     def post(self):
         json_data = request.get_json(force=True)
         if not json_data:
@@ -38,8 +47,10 @@ class AircraftResource(Resource):
         # return 200 OK, 201 would be 'created'
         return {'status': "success", 'data': result}, 200
 
+    @login_required
     def put(self):
         return {}, 204
 
+    @login_required
     def delete(self):
         return {}, 204

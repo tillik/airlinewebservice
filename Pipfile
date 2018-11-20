@@ -14,6 +14,9 @@ flask-marshmallow = "*"
 marshmallow-sqlalchemy = "*"
 "psycopg2" = "*"
 flask-security = "*"
+wtforms = "*"
+flask-admin = "*"
+flask-login = "*"
 
 [dev-packages]
 

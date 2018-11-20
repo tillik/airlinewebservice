@@ -1,15 +1,25 @@
-from flask import request
+from flask import request, json,jsonify
 from flask_restful import Resource
+from flask_security import login_required
 from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
+from marshmallow import fields, pprint
 
 flights_schema = FlightSchema(many=True)
 flight_schema = FlightSchema()
 
 class FlightResource(Resource):
+    
+    @login_required
     def get(self):
-        return {}, 200
+        flights = Flight.query.all()
+        result = flight_schema.dump(flights)
+        response = jsonify(result)
+        response.status_code = 200
+        return response
+        #return {json.dumps(result)}, 200
 
     # Create new flight
+    @login_required
     def post(self):
        json_data = request.get_json(force=True)
        if not json_data:
@@ -23,11 +33,11 @@ class FlightResource(Resource):
        if flight:
            return {'message': 'Flight already exists'}, 400
        flight = Flight(
-           number=json_data['flightnumbernumber'],
+           number=json_data['number'],
            start=json_data['start'],
            end=json_data['end'],
            departure=json_data['departure'],
-           aircraft=json_data['aircraft']
+           aircrafttype=json_data['aircraft']
            )
 
        db.session.add(flight)
@@ -40,8 +50,10 @@ class FlightResource(Resource):
        #return { "status": 'success', 'data': result }, 200
        return {"status": 'success', "location": '/v1/flight/'+flight.number}, 200
 
+    @login_required
     def put(self):
         return {}, 204
 
+    @login_required
     def delete(self):
         return {}, 204

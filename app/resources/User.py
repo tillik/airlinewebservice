@@ -1,5 +1,6 @@
 from flask import request, jsonify, url_for, abort, make_response
 from flask_restful import Resource
+from flask_security import login_required
 from model import db, User, UserSchema
 import sys
 
@@ -8,6 +9,15 @@ user_schema = UserSchema()
 
 class UserResource(Resource):
    
+   # Get all users
+    @login_required
+    def get(self):
+        users = User.query.all()
+        result = user_schema.dump(users)
+        response = jsonify(result)
+        response.status_code = 200
+        return response
+
     def post(self):
         #username = request.json.get('username')
         json_data = request.get_json(force=True)

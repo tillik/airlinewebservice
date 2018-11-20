@@ -1,19 +1,21 @@
 import os
 
-from flask import Flask, Blueprint, render_template
+from flask import Flask, Blueprint, render_template, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required, utils
 from flask_restful import Api
 from flask_migrate import Migrate
-from model import User, Role
+from flask_admin import Admin
+from flask_login import logout_user
+from model import db, User, Role, UserAdmin, RoleAdmin
 from resources.Welcome import Welcome
 from resources.Flight import FlightResource
 from resources.Aircraft import AircraftResource
 from resources.Ticket import TicketResource
 from resources.Seat import SeatResource
 from resources.User import UserResource
-from model import db, User, Role
 
+# read db settings from environment
 database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}'.format(
     dbuser=os.environ['DBUSER'],
     dbpass=os.environ['DBPASS'],
@@ -46,7 +48,7 @@ app.register_blueprint(api_bp, url_prefix='/v1')
 
 # Routes
 api.add_resource(Welcome, '/Welcome')
-api.add_resource(FlightResource, '/flights')
+api.add_resource(FlightResource, '/flight')
 api.add_resource(TicketResource, '/ticket')
 api.add_resource(AircraftResource, '/aircraft')
 api.add_resource(SeatResource, '/seat')
@@ -110,12 +112,30 @@ def before_first_request():
 def index():
     return render_template('index.html')
 
-#if __name__ == "__main__":
-#    #app.run(debug=True)
-#
-#    # listen on all ips
-#    app.run(
-#        host='0.0.0.0',
-#        port=int('8080'),
-#        debug=app.config['DEBUG']
-#    )
+# Create a logout URL
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(index.html)
+
+# set optional bootswatch theme for flask admin
+app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
+
+# Initialize Flask-Admin
+admin = Admin(app, template_mode='bootstrap3')
+
+# Add Flask-Admin views for Users and Roles
+admin.add_view(UserAdmin(User, db.session))
+admin.add_view(RoleAdmin(Role, db.session))
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+    # listen on all ips
+    #app.run(
+    #    host='0.0.0.0',
+    #    port=int('8080'),
+    #    debug=app.config['DEBUG']
+    #)

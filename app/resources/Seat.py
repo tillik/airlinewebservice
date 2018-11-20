@@ -1,15 +1,24 @@
-from flask import request
+from flask import request, jsonify
 from flask_restful import Resource
+from flask_security import login_required
 from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
 
 seat_schema = SeatSchema(many=True)
 seat_schema = SeatSchema()
 
 class SeatResource(Resource):
+    
+    # Return all seats
+    @login_required
     def get(self):
-        return {}, 200
+        seats = Seat.query.all()
+        result = seat_schema.dump(seats)
+        response = jsonify(result)
+        response.status_code = 200
+        return response
 
     # Create new seat
+    @login_required
     def post(self):
        json_data = request.get_json(force=True)
        if not json_data:
@@ -37,8 +46,10 @@ class SeatResource(Resource):
        # return 200 OK, 201 would be created 
        return { "status": 'success', 'data': result }, 200
 
+    @login_required
     def put(self):
         return {}, 204
 
+    @login_required
     def delete(self):
         return {}, 204
