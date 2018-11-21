@@ -8,6 +8,7 @@ from sqlalchemy import PrimaryKeyConstraint, UniqueConstraint, CheckConstraint
 from enum import Enum
 from passlib.apps import custom_app_context as pwd_context
 from flask_admin.contrib import sqla
+from datetime import datetime
 from wtforms import PasswordField
 
 # https://www.sqlalchemy.org/
@@ -45,7 +46,7 @@ class Seat(db.Model):
     # See above check constraint greater than 1
     seatrow = db.Column(db.Integer, nullable=False)
     
-    flightnumber =  db.Column(db.String(10), db.ForeignKey('flights.number', ondelete='CASCADE'), nullable=False)
+    flightnumber =  db.Column(db.String(10), db.ForeignKey('flights.flightnumber', ondelete='CASCADE'), nullable=False)
     flight = db.relationship('Flight', backref=db.backref('seats', lazy='dynamic' ))
 
     # Compound primary key of setlabel & seatrow:
@@ -74,7 +75,7 @@ class Ticket(db.Model):
     
     number = db.Column(db.String(10),unique=True, nullable=False, primary_key=True)
     
-    flightnumber = db.Column(db.String(10), db.ForeignKey('flights.number', ondelete='CASCADE'), nullable=False)
+    flightnumber = db.Column(db.String(10), db.ForeignKey('flights.flightnumber', ondelete='CASCADE'), nullable=False)
     flight = db.relationship('Flight', backref=db.backref('tickets', lazy='dynamic' ))
     
     passengername = db.Column(db.String(25),nullable=False)
@@ -98,29 +99,36 @@ class TicketSchema(ma.Schema):
 class Flight(db.Model):
     __tablename__ = 'flights'
 
-    number = db.Column(db.String(10), unique=True, nullable=False, primary_key=True)
+    flightnumber = db.Column(db.String(10), unique=True, nullable=False, primary_key=True)
     start = db.Column(db.String(3), nullable=False)
     end = db.Column(db.String(3), nullable=False)
-    departure = db.Column(db.DateTime, nullable=False)
-    aircrafttype  = db.Column(db.String(15), db.ForeignKey('aircrafts.aircraft', ondelete='CASCADE'), nullable=False)
-    aircraft = db.relationship('Aircraft', backref=db.backref('flights', lazy='dynamic' ))
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    aircraft  = db.Column(db.String(15), db.ForeignKey('aircrafts.aircraft', ondelete='CASCADE'), nullable=False)
+    aircrafttype = db.relationship('Aircraft', backref=db.backref('flights', lazy='dynamic' ))
 
      # flights should have a combined key of departure / start / end / aircrafttype ? 
     __table_args__ = (
-        UniqueConstraint(start, end, 'departure', name="check_deptstartend_unique"),
+        UniqueConstraint(start, end, 'date', name="check_deptstartend_unique"),
         {})
 
-    def __init__(self, number, start, end, date):
-        self.number = number
+    def __init__(self, flightnumber, start, end, date, aircraft):
+        self.flightnumber = flightnumber
         self.start = start
         self.end = end
         self.date = date
+        self.aircraft = aircraft
 
+# the schema determines serialization fields
 class FlightSchema(ma.Schema):
-    number = fields.String(required=True, validate=validate.Length(1))
+    flightnumber = fields.String(required=True, validate=validate.Length(1))
     start = fields.String()
     end = fields.String()
+    # same value with different encodings. Z and +00:00 are equivalent.
+    #departure = fields.DateTime('%Y-%m-%dT%H:%M:%SZ')
     date = fields.DateTime()
+    aircraft = fields.String()
+    
+    #departure.dateformat("ISO8601")
 
 # Create a table to support a many-to-many relationship between Users and Roles
 roles_users = db.Table(

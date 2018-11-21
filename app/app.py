@@ -9,8 +9,8 @@ from flask_admin import Admin
 from flask_login import logout_user
 from model import db, User, Role, UserAdmin, RoleAdmin
 from resources.Welcome import Welcome
-from resources.Flight import FlightResource
-from resources.Aircraft import AircraftResource
+from resources.Flight import FlightResource, FlightsResource
+from resources.Aircraft import AircraftResource, AircraftsResource
 from resources.Ticket import TicketResource
 from resources.Seat import SeatResource
 from resources.User import UserResource
@@ -48,9 +48,11 @@ app.register_blueprint(api_bp, url_prefix='/v1')
 
 # Routes
 api.add_resource(Welcome, '/Welcome')
-api.add_resource(FlightResource, '/flight')
+api.add_resource(FlightsResource, '/flights')
+api.add_resource(FlightResource, '/flight/<string:flightnumber>')
+api.add_resource(AircraftsResource, '/aircrafts')
+api.add_resource(AircraftResource, '/aircraft/<string:aircraft>')
 api.add_resource(TicketResource, '/ticket')
-api.add_resource(AircraftResource, '/aircraft')
 api.add_resource(SeatResource, '/seat')
 api.add_resource(UserResource, '/user')
 
