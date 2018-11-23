@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, Blueprint, render_template, redirect
+from flask import Flask, Blueprint, render_template, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required, utils
 from flask_restful import Api
@@ -116,10 +116,12 @@ def index():
 
 # Create a logout URL
 @app.route("/logout")
-@login_required
+#@login_required
 def logout():
     logout_user()
-    return redirect(index.html)
+    #return redirect(index.html)
+    session.clear()
+    return redirect(url_for('index'))
 
 # set optional bootswatch theme for flask admin
 app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'

@@ -1,6 +1,7 @@
-from flask import request, json,jsonify
+from flask import request, json,jsonify, session
 from flask_restful import Resource
-from flask_security import login_required
+from flask_security import login_required, roles_required
+from flask_login import current_user
 from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
 from marshmallow import fields, pprint
 import sys
@@ -87,10 +88,11 @@ class FlightsResource(Resource):
 class FlightResource(Resource):
     
     @login_required
-    def get(self, number):
-        if number:
-            flights = Flight.query.all()
-            result = flight_schema.dump(flights)
+    def get(self, flightnumber):
+        if flightnumber:
+            #flights = Flight.query.all()
+            flight = Flight.query.filter_by(flightnumber=flightnumber).first()
+            result = flight_schema.dump(flight)
             response = jsonify(result)
             response.status_code = 200
             return response
@@ -98,7 +100,9 @@ class FlightResource(Resource):
         return {'error': 'Missing flight number in request'}, 400
 
     @login_required
+    @roles_required('admin')
     def  delete(self, flightnumber):
+        print('Current user is: '+ current_user.email, file=sys.stdout)
         if flightnumber:
             flight = Flight.query.filter_by(flightnumber=flightnumber).first()
             if not flight:
@@ -106,4 +110,4 @@ class FlightResource(Resource):
             else:
                 db.session.delete(flight)
                 db.session.commit()
-   
+                
