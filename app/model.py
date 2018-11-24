@@ -1,4 +1,4 @@
-import random, string
+import random, string, logging
 from flask import Flask
 from marshmallow import Schema, fields, pre_load, post_load, validate
 from flask_marshmallow import Marshmallow
@@ -44,10 +44,10 @@ class Seat(db.Model):
     #parent = db.relationship("Ticket", back_populates="child")
 
     # TODO: seatnumber is a combination of <ticketnumber>-<seatlabel><seatrow>?
-    number = db.Column(db.String(11))
+    #ticketnumber = db.Column(db.String(11))
 
     # TODO: only one seat per ticket
-    #ticketnumber = db.Column(db.String(15), db.ForeignKey('tickets.number', ondelete='CASCADE'), nullable=False)
+    ticketnumber = db.Column(db.String(15), db.ForeignKey('tickets.number'), nullable=True)
     #ticket= db.relationship('Ticket', backref=db.backref('seats', lazy='dynamic' ))
     
     # Enum constraint seats labeled from A - H
@@ -59,19 +59,40 @@ class Seat(db.Model):
     flightnumber =  db.Column(db.String(10), db.ForeignKey('flights.flightnumber', ondelete='CASCADE'), nullable=False)
     flight = db.relationship('Flight', backref=db.backref('seats', lazy='dynamic' ))
 
-    def __init__(self, number, seatlabel, seatrow, flightnumber):
-        self.number = number
-        #self.ticketnumber = ticketnumber
+    def __init__(self, ticketnumber, flightnumber, seatlabel, seatrow):
+        #self.number = number
+        self.ticketnumber = ticketnumber
+        self.flightnumber = flightnumber
         self.seatlabel = seatlabel
         self.seatrow = seatrow
-        self.flightnumber = flightnumber
-
+        
 class SeatSchema(ma.Schema):
-    number = fields.String(required=True, validate=validate.Length(10))
+    number = fields.String(validate=validate.Length(10))
     ticketnumber = fields.String(required=True, validate=validate.Length(1))
     seatlabel = fields.String(required=True, validate=validate.Length(1))
     seatrow = fields.String(required=True, validate=validate.Length(1))
     flightnumber = fields.String(required=True, validate=validate.Length(1))
+
+    @pre_load
+    def formatJsonKeys(self, data):
+       
+        ticketnumber = data.get('ticket-number')
+        if ticketnumber:
+            data['ticketnumber'] = data.pop('ticket-number')
+
+        seatlabel = data.get('Seat-label')
+        if seatlabel:
+            data['seatlabel'] = data.pop('Seat-label')
+
+        seatrow = data.get('Seat-row')
+        if seatrow:
+            data['seatrow'] = data.pop('Seat-row')
+
+        flightnumber = data.get('Flight-number')
+        if flightnumber:
+            data['flightnumber'] = data.pop('Flight-number')
+            
+        return data
 
 class Ticket(db.Model):
     __tablename__ = 'tickets'
@@ -97,44 +118,45 @@ class Ticket(db.Model):
         self.status = "valid"
 
 class TicketSchema(ma.Schema):
-    id=fields.Integer()
-    number = fields.String()
+    id = fields.Integer()
+    number = fields.String(required=False)
     flightnumber = fields.String(required=True, validate=validate.Length(1))
-    passengername = fields.String(required=True)
-    passportnumber = fields.String(required=True)
-    # default to "None" if no seatnumber is given? try (default=None)
-    seat_id = fields.String(missing=None)
-    #status= fields.Boolean()
-
-    # TODO: pre_load not executed? Why?
-    # normalize the dashed names from JSON requests into schema fields (dashes are not allowed in schema fieldnames)
+    passengername = fields.String(required=True, validate=validate.Length(1))
+    passportnumber = fields.String(required=True, validate=validate.Length(1))
+    status = fields.String()
+    seat_id = fields.String() # default to "None" if no seatnumber is given? try (default=None)
+   
     @pre_load
-    def formatJsonKeys(self, data):
-        id = data.get('id')
-        if id:
-            data.pop('id')
-
-        number = data.get('number')
+    def formatKeys(self, data):
+        number = data.get('ticket-number')
         if number:
-            data['ticket-number'] = data.pop('number')
+            data['number'] = data.pop('ticket-number')
 
-        flightnumber = data.get('flightnumber')
+        flightnumber = data.get('flight-number')
         if flightnumber:
-                data['fligh-tnumber'] = data.pop('flightnumber')
+                data['flightnumber'] = data.pop('flight-number')
 
-        passengername = data.get('passengername')
+        passengername = data.get('name')
         if passengername:
-                data['name'] = data.pop('passengername')
+                data['passengername'] = data.pop('name')
 
-        passportnumber = data.get('passportnumber')
+        passportnumber = data.get('pass-number')
         if passportnumber:
-            data['pass-number'] = data.pop('passportnumber')
+            data['passportnumber'] = data.pop('pass-number')
         
-        seatnumber = data.get('seatnumber')
+        seatnumber = data.get('seat_number')
         if seatnumber:
-            data['seat_number'] = data.pop('seatnumber')
+            data['seatnumber'] = data.pop('seat_number')
 
         return data
+
+    # raise a custom exception when (de)serialization fails
+    def handle_error(self, exc, data):
+        logging.error(exc.messages)
+        raise AppError('An error occurred with input: {0}'.format(data))
+
+class AppError(Exception):
+    pass
 
 class Flight(db.Model):
     __tablename__ = 'flights'

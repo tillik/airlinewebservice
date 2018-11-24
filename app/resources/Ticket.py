@@ -7,7 +7,7 @@ from flask_login import current_user
 from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
 
 tickets_schema = TicketSchema(many=True)
-ticket_schema = TicketSchema()
+ticket_schema = TicketSchema(partial=True)
 
 class TicketsResource(Resource):
     
@@ -29,11 +29,11 @@ class TicketsResource(Resource):
         # deserialize input: map json fields to schema fields
         # specifying partial=True to enable seatnumber being optional
         
-        # TODO: the sample requests contain dashes in the JSON fieldnames which prevents simply mapping them 
+        # the sample requests contain dashes in the JSON fieldnames which prevents simply mapping them 
         # to schema fields. This collides when I try to deserialize them (to renamed json fields)  with some fields beinf optional like seatnumber
         # this does not work:
         # data, errors = ticket_schema.load({"flightnumber":json_data["flight-number"],"passengername":json_data["passengername"],"passportnumber":json_data["pass-number"],"seatnumber":json_data["seat_number"]}, partial=True)
-        # overload the serializer for each schema?
+        # TODO: overload the serializer for each schema?
         data, errors = ticket_schema.load(json_data, partial=True)
         
 
@@ -41,52 +41,62 @@ class TicketsResource(Resource):
             return {"status": "error", "data": errors}, 422
         
         # only one ticket per passport
-        ticket = Ticket.query.filter_by(passportnumber=data["passportnumber"]).first()
-        if ticket:
-            return {'ticket': 'Passport-number already booked a seat'}, 400
+        if "ticketnumber" in data:
+            ticket = Ticket.query.filter_by(passportnumber=data["passportnumber"]).first()
+            if ticket:
+                return {'ticket': 'Passport-number already booked a seat'}, 400
 
         # check ticket-db if seatnumber is already taken (seatnumber is optional)
-        seatnr=data["seatnumber"]
-        if not seatnr == "None":
-            # try to find tickets with requested seatnumber
-            #ticket = Ticket.query.filter_by(seat.number=seatnr).first()
+        if "seatnumber" in data:
+            seatnr=data["seatnumber"]
+                # try to find tickets with requested seatnumber
+                #ticket = Ticket.query.filter_by(seat.number=seatnr).first()
             ticket = Seat.query(Ticket).join(Seat, Ticket.id).filter(Seat.number==seatnr)
             if ticket:
                 return {'ticket': 'Seatnumber already booked'}, 400
            
         # get seatcount from aircraft specified in ticket 
-        flight = Flight.query.filter_by(flightnumber=data["flightnumber"]).first()
-        if flight:
-            aircraft = Aircraft.query.filter_by(aircraft=flight.aircraft).first()
-            if not aircraft:
-                return {'ticket': 'Ticket containing invalid aircraft'}, 400
-            else: 
-                seatcount = aircraft.seatcount
-        else:
-            return {'ticket': 'Flight does not exist'}, 400
-        
-        # sum existing tickets for same flight must be smaller than seatcount
-        tickets  = Ticket.query.filter_by(flightnumber=data["flightnumber"])
-        ticketsnumber = tickets.count()
+        if "flightnumber" in data:
+            flight = Flight.query.filter_by(flightnumber=data["flightnumber"]).first()
+            if flight:
+                aircraft = Aircraft.query.filter_by(aircraft=flight.aircraft).first()
+                if not aircraft:
+                    return {'ticket': 'Ticket containing invalid aircraft'}, 400
+                else: 
+                    seatcount = aircraft.seatcount
+            else:
+                return {'ticket': 'Flight does not exist'}, 400
 
-        if ticketsnumber >= seatcount:
-            return {'ticket': 'No more seats left for this flight'}, 400
+        try:
 
-        ticket = Ticket(
-            flightnumber=data['flightnumber'],
-            passengername=data['passengername'],
-            passportnumber=data['passportnumber'],
-        )
+            # sum existing tickets for same flight must be smaller than seatcount
+            tickets  = Ticket.query.filter_by(flightnumber=data["flightnumber"])
+            ticketsnumber = tickets.count()
 
-        db.session.add(ticket)
-        db.session.commit()
+            if ticketsnumber >= seatcount:
+                return {'ticket': 'No more seats left for this flight'}, 400
 
-        result = ticket_schema.dump(ticket).data
+            ticket = Ticket(
+                flightnumber=data['flightnumber'],
+                passengername=data['passengername'],
+                passportnumber=data['passportnumber'],
+            )
 
-        # return 200 OK, 201 would be created 
-        # return { "status": 'success', 'data': result }, 200
-        # After the flight is created the URL to the GET request of this flight is given as a response
-        return {"status": 'success', "location": '/v1/ticket/'+ticket.number}, 200
+            db.session.add(ticket)
+            db.session.commit()
+
+            result = ticket_schema.dump(ticket).data
+
+            # return 200 OK, 201 would be created 
+            # return { "status": 'success', 'data': result }, 200
+            # After the flight is created the URL to the GET request of this flight is given as a response
+            return {"status": 'success', "location": '/v1/ticket/'+ticket.number}, 200
+
+        except Exception as e:
+            db.session.rollback()
+            print("Exception:" + str(e))
+            return {"Error": 'Exception on ticket creation: ' + str(e)}, 400
+
 
     @login_required
     def put(self):

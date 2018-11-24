@@ -12,7 +12,7 @@ from resources.Welcome import Welcome
 from resources.Flight import FlightResource, FlightsResource
 from resources.Aircraft import AircraftResource, AircraftsResource
 from resources.Ticket import TicketResource, TicketsResource
-from resources.Seat import SeatResource
+from resources.Seat import SeatResource, SeatsResource
 from resources.User import UserResource
 
 
@@ -55,7 +55,8 @@ api.add_resource(AircraftsResource, '/aircrafts')
 api.add_resource(AircraftResource, '/aircraft/<string:aircraft>')
 api.add_resource(TicketsResource, '/ticket')
 api.add_resource(TicketResource, '/ticket/<string:ticketnumber>')
-api.add_resource(SeatResource, '/seat')
+api.add_resource(SeatsResource, '/seat')
+api.add_resource(SeatResource, '/seat/<string:seatcode>')
 api.add_resource(UserResource, '/user')
 
 
