@@ -1,10 +1,12 @@
+import random, string
 from flask import Flask
-from marshmallow import Schema, fields, pre_load, validate
+from marshmallow import Schema, fields, pre_load, post_load, validate
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import UserMixin, RoleMixin, login_required, utils
 from flask_login import current_user
 from sqlalchemy import PrimaryKeyConstraint, UniqueConstraint, CheckConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
 from enum import Enum
 from passlib.apps import custom_app_context as pwd_context
 from flask_admin.contrib import sqla
@@ -36,12 +38,20 @@ class AircraftSchema(ma.Schema):
 class Seat(db.Model):
     __tablename__ = 'seats'
 
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # relationship is defined in the parent (Ticket) using a backref, therefore unneccessary here?
+    #parent_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
+    #parent = db.relationship("Ticket", back_populates="child")
+
+    # TODO: seatnumber is a combination of <ticketnumber>-<seatlabel><seatrow>?
+    number = db.Column(db.String(11))
+
     # TODO: only one seat per ticket
-    ticketnumber = db.Column(db.String(15), db.ForeignKey('tickets.number', ondelete='CASCADE'), nullable=False)
-    ticket= db.relationship('Ticket', backref=db.backref('seats', lazy='dynamic' ))
+    #ticketnumber = db.Column(db.String(15), db.ForeignKey('tickets.number', ondelete='CASCADE'), nullable=False)
+    #ticket= db.relationship('Ticket', backref=db.backref('seats', lazy='dynamic' ))
     
     # Enum constraint seats labeled from A - H
-    seatlabel = db.Column(db.Enum('A','B','C','D','E','F','G','H', name="seatlabelenum", create_type=False), nullable=False)
+    seatlabel = db.Column(db.Enum('A','B','C','D','E','F','G','H', name="seatlabelenum", create_type=True), nullable=False)
     
     # See above check constraint greater than 1
     seatrow = db.Column(db.Integer, nullable=False)
@@ -49,22 +59,15 @@ class Seat(db.Model):
     flightnumber =  db.Column(db.String(10), db.ForeignKey('flights.flightnumber', ondelete='CASCADE'), nullable=False)
     flight = db.relationship('Flight', backref=db.backref('seats', lazy='dynamic' ))
 
-    # Compound primary key of setlabel & seatrow:
-    # https://docs.sqlalchemy.org/en/latest/core/constraints.html 
-    # https://stackoverflow.com/questions/11168492/composite-keys-in-sqlalchemy
-    __table_args__ = (
-        PrimaryKeyConstraint(seatlabel, seatrow),
-        UniqueConstraint(seatlabel, seatrow, name="check_seatlabelrow_unique"),
-        CheckConstraint(seatrow>=1, name='check_seatrow_minimumone'),
-        {})
-
-    def __init__(self, ticketnumber, seatlabel, seatrow, flightnumber):
-        self.ticketnumber = ticketnumber
+    def __init__(self, number, seatlabel, seatrow, flightnumber):
+        self.number = number
+        #self.ticketnumber = ticketnumber
         self.seatlabel = seatlabel
         self.seatrow = seatrow
         self.flightnumber = flightnumber
 
 class SeatSchema(ma.Schema):
+    number = fields.String(required=True, validate=validate.Length(10))
     ticketnumber = fields.String(required=True, validate=validate.Length(1))
     seatlabel = fields.String(required=True, validate=validate.Length(1))
     seatrow = fields.String(required=True, validate=validate.Length(1))
@@ -73,28 +76,65 @@ class SeatSchema(ma.Schema):
 class Ticket(db.Model):
     __tablename__ = 'tickets'
     
-    number = db.Column(db.String(10),unique=True, nullable=False, primary_key=True)
-    
+    id = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    number = db.Column(db.String(10),unique=True, nullable=False)
     flightnumber = db.Column(db.String(10), db.ForeignKey('flights.flightnumber', ondelete='CASCADE'), nullable=False)
     flight = db.relationship('Flight', backref=db.backref('tickets', lazy='dynamic' ))
-    
     passengername = db.Column(db.String(25),nullable=False)
-    
     passportnumber = db.Column(db.String(10),nullable=False)
+    status = db.Column(db.Enum('valid','cancelled',name="ticketstatusenum", create_type=True), nullable=False)
+    #seatnumber = db.Column(db.String(10), db.ForeignKey('seats.seatnumber'), nullable=True)
+    seat_id = db.Column(db.Integer, db.ForeignKey('seats.id'))
+    #seat = db.relationship("Seat", backref=db.backref("ticket", uselist=False))
+    # TODO:  Add a column-property for returning the "full" tickenumber <number>-<seatlabelseatrow> when seat is booked?
 
-    #    PrimaryKeyConstraint(number),
-    #    {})
-
-    def __init__(self, number, flightnumber, passengername, passportnumber):
-        self.number = number
+    def __init__(self, flightnumber, passengername, passportnumber):
+        # use first seven chars of passport to create the ticketnumber
+        self.number = passportnumber[0:7]
         self.flightnumber = flightnumber
         self.passengername = passengername
         self.passportnumber = passportnumber
+        self.status = "valid"
 
 class TicketSchema(ma.Schema):
+    id=fields.Integer()
+    number = fields.String()
     flightnumber = fields.String(required=True, validate=validate.Length(1))
-    passenbername = fields.String(required=True)
-    passenbernumber = fields.String(required=True)
+    passengername = fields.String(required=True)
+    passportnumber = fields.String(required=True)
+    # default to "None" if no seatnumber is given? try (default=None)
+    seat_id = fields.String(missing=None)
+    #status= fields.Boolean()
+
+    # TODO: pre_load not executed? Why?
+    # normalize the dashed names from JSON requests into schema fields (dashes are not allowed in schema fieldnames)
+    @pre_load
+    def formatJsonKeys(self, data):
+        id = data.get('id')
+        if id:
+            data.pop('id')
+
+        number = data.get('number')
+        if number:
+            data['ticket-number'] = data.pop('number')
+
+        flightnumber = data.get('flightnumber')
+        if flightnumber:
+                data['fligh-tnumber'] = data.pop('flightnumber')
+
+        passengername = data.get('passengername')
+        if passengername:
+                data['name'] = data.pop('passengername')
+
+        passportnumber = data.get('passportnumber')
+        if passportnumber:
+            data['pass-number'] = data.pop('passportnumber')
+        
+        seatnumber = data.get('seatnumber')
+        if seatnumber:
+            data['seat_number'] = data.pop('seatnumber')
+
+        return data
 
 class Flight(db.Model):
     __tablename__ = 'flights'
@@ -105,7 +145,7 @@ class Flight(db.Model):
     date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     aircraft  = db.Column(db.String(15), db.ForeignKey('aircrafts.aircraft', ondelete='CASCADE'), nullable=False)
     aircrafttype = db.relationship('Aircraft', backref=db.backref('flights', lazy='dynamic' ))
-
+    status = db.Column(db.Enum('valid','cancelled',name="ticketstatusenum", create_type=True), nullable=False)
      # flights should have a combined key of departure / start / end / aircrafttype ? 
     __table_args__ = (
         UniqueConstraint(start, end, 'date', name="check_deptstartend_unique"),
@@ -117,6 +157,16 @@ class Flight(db.Model):
         self.end = end
         self.date = date
         self.aircraft = aircraft
+
+    # get status 
+    @hybrid_property
+    def status(self):
+        return self.status
+
+    # set status
+    @status.setter
+    def status(self, status):
+        self.status = status
 
 # the schema determines serialization fields
 class FlightSchema(ma.Schema):

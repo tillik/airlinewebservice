@@ -1,4 +1,4 @@
-import os
+import os,sys, logging
 
 from flask import Flask, Blueprint, render_template, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
@@ -11,9 +11,10 @@ from model import db, User, Role, UserAdmin, RoleAdmin
 from resources.Welcome import Welcome
 from resources.Flight import FlightResource, FlightsResource
 from resources.Aircraft import AircraftResource, AircraftsResource
-from resources.Ticket import TicketResource
+from resources.Ticket import TicketResource, TicketsResource
 from resources.Seat import SeatResource
 from resources.User import UserResource
+
 
 # read db settings from environment
 database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}'.format(
@@ -52,7 +53,8 @@ api.add_resource(FlightsResource, '/flights')
 api.add_resource(FlightResource, '/flight/<string:flightnumber>')
 api.add_resource(AircraftsResource, '/aircrafts')
 api.add_resource(AircraftResource, '/aircraft/<string:aircraft>')
-api.add_resource(TicketResource, '/ticket')
+api.add_resource(TicketsResource, '/ticket')
+api.add_resource(TicketResource, '/ticket/<string:ticketnumber>')
 api.add_resource(SeatResource, '/seat')
 api.add_resource(UserResource, '/user')
 
@@ -133,9 +135,13 @@ admin = Admin(app, template_mode='bootstrap3')
 admin.add_view(UserAdmin(User, db.session))
 admin.add_view(RoleAdmin(Role, db.session))
 
+# logging to the console
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    #app.run(debug=True)
+    app.run()
 
     # listen on all ips
     #app.run(
