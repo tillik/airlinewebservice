@@ -1,4 +1,4 @@
-import sys
+import sys, re
 
 from flask import request, jsonify
 from flask_restful import Resource
@@ -63,7 +63,7 @@ class SeatsResource(Resource):
                 db.session.commit()
                 
                 # return 200 OK, 201 would be created 
-                return {"status": 'success', "location": '/v1/seat/'+seatcode}, 200
+                return {"Location": '/v1/seat/'+seatcode}, 200
 
             except Exception as e:
                 db.session.rollback()
@@ -85,8 +85,11 @@ class SeatResource(Resource):
         print('Current user is: '+ current_user.email, file=sys.stdout)
         
         try:
-            
-            if seatcode:
+
+            # only match seatcodes like T123456-B8
+            pattern = re.compile("^([A-Z0-9]{7}-[A-Z0-9]{2})$")
+
+            if pattern.match(seatcode):
                 # split the seatcode into three parts <Ticketnumber>-<Leatlabel><Seatrow>
                 parts = seatcode.partition('-')
                 ticketnumber = parts[0]
@@ -102,6 +105,7 @@ class SeatResource(Resource):
                     seat.ticketnumber = None
                     db.session.commit()
                     return {"status": "Successfully cancelled booking of seat"}, 200
+
         except Exception as e:
             db.session.rollback()
             print("Exception:" + str(e))

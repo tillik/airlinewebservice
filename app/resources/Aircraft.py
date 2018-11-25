@@ -35,21 +35,7 @@ class AircraftsResource(Resource):
         if not 'aircraft' in json_data:
             return {"success": False, "msg": "must specify aircraft in request"}, 400
 
-        #else:
-        #    # remember QuoteSchema.make_object causes an assert
-        #    try:
-        #       # q = aircraft_schema.load(request['json']).data
-        #        q = aircraft_schema.load(json_data)
-        #    except AssertionError as e:
-        #        return {'success': False, 'msg': str(e)}, 400
-        #    else:
-        #        print('POST add new aircraft=' + json_data['aircraft'] + ' with seatcount=' +str(json_data['seatcount']), file=sys.stdout)
-        #        Aircraft.append(q)
-        #        #return {"success": True, "msg": "Quote added."}
-        #        #TODO: return 200 ok with create aircraft
-
         # validate & deserialize input
-
         data, errors = aircraft_schema.load(json_data)
         if errors:
             return {"status": "error", "data": errors}, 422        
@@ -57,17 +43,18 @@ class AircraftsResource(Resource):
         if aircraft:
             return {'message': 'Aircraft already exists'}, 400
          
+        # TODO: creating an object could be done via the pre_load method in the schema
         aircraft = Aircraft(
             aircraft=data['aircraft'],
             seatcount=data['seatcount']
             )
+
         db.session.add(aircraft)
         db.session.commit()
         result = aircraft_schema.dump(aircraft).data
         # return 200 OK, 201 would be 'created'
         return {'status': "success", 'data': result}, 200
        
-
     @login_required
     def put(self):
         return {}, 204

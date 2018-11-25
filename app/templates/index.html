@@ -3,11 +3,21 @@
 <body>
 	<b>Welcome to the flight booking webservice!</b><br>
 	<a href="/logout">[Logout]</a>
-	<p>Use the following curl's:</p>
+	<p>Use the following available endpoints for GET/PUT/POST/DELETE.</p>
 	<p>
-	Create an aircraft:<br>
+	Endpoints:<br>
 	<ul>
-		<li>curl -i -X POST -H "Content-Type:application/json" -d "{\"firstName\": \"Frodo\",  \"lastName\" : \"Baggins\" }" http://localhost:8080/people </li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/aircrafts">http://airlinews.azurewebsites.net/v1/aircrafts</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/flights">http://airlinews.azurewebsites.net/v1/flights</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/flight">http://airlinews.azurewebsites.net/v1/flight<string:flightnumber></li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/aircrafts">http://airlinews.azurewebsites.net/v1/aircrafts</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/aircraft">http://airlinews.azurewebsites.net/v1/aircraft<string:aircraft></li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/ticket">http://airlinews.azurewebsites.net/v1/ticket</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/ticket">http://airlinews.azurewebsites.net/v1/ticket<string:ticketnumber></li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/seat">http://airlinews.azurewebsites.net/v1/seat</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/seat">http://airlinews.azurewebsites.net/v1/seat<string:seatcode></li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/user">http://airlinews.azurewebsites.net/v1/user</li>
+		<li><a href="http://airlinews.azurewebsites.net/v1/checkin">http://airlinews.azurewebsites.net/v1/checkin</li>
 	</ul>
 	</p>
 	</body>
