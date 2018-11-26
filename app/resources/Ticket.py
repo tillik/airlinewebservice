@@ -1,10 +1,10 @@
-import sys
+import sys, logging
 
 from flask import request, jsonify
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
+from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 
 tickets_schema = TicketSchema(many=True)
 ticket_schema = TicketSchema(partial=True)
@@ -35,16 +35,19 @@ class TicketsResource(Resource):
         # data, errors = ticket_schema.load({"flightnumber":json_data["flight-number"],"passengername":json_data["passengername"],"passportnumber":json_data["pass-number"],"seatnumber":json_data["seat_number"]}, partial=True)
         # TODO: overload the serializer for each schema / create propert objects in schema pre_load?
         data, errors = ticket_schema.load(json_data, partial=True)
-        
 
         if errors:
             return {"status": "error", "data": errors}, 422
+
+        # input validation
+        if not all (k in data for k in ("flightnumber", "passengername", "passportnumber")):
+            return {'error': 'Please provide flightnumber, passengername and passportnumber !'}, 404
         
-        # only one ticket per passport
+        # only one ticket (that is not canceled) per passport for a flight 
         if "passportnumber" in data:
-            ticket = Ticket.query.filter_by(passportnumber=data["passportnumber"]).first()
+            ticket = Ticket.query.filter_by(passportnumber=data["passportnumber"]).filter_by(flightnumber=data["flightnumber"]).filter(Ticket.status != "cancelled").first()
             if ticket:
-                return {'message': 'Passport-number already booked a ticket'}, 404
+                return {'message': 'Passport-number already booked a ticket for this flight'}, 404
 
         # check ticket-db if seatnumber is already taken (seatnumber is optional)
         if "seatnumber" in data:
@@ -84,6 +87,20 @@ class TicketsResource(Resource):
             )
 
             db.session.add(ticket)
+            db.session.commit()
+
+            # Create a notification for ticket booking using the ticketnumber for the just created ticket
+            ticket = Ticket.query.filter_by(passportnumber=data["passportnumber"]).filter_by(flightnumber=data["flightnumber"]).filter(Ticket.status != "cancelled").first()
+            
+            notificationstring = "Your ticket booking " + ticket.number+ " is successful."
+            logging.info(notificationstring)
+            notification = Notification(
+                title = "Booking Successful",
+                message = notificationstring,
+                ticketnumber = ticket.number
+            )
+
+            db.session.add(notification)
             db.session.commit()
 
             result = ticket_schema.dump(ticket).data

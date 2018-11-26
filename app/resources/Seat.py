@@ -1,10 +1,10 @@
-import sys, re
+import sys, re, logging, sqlalchemy
 
 from flask import request, jsonify
 from flask_restful import Resource
 from flask_security import login_required
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
+from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 
 seat_schema = SeatSchema(many=True)
 seat_schema = SeatSchema()
@@ -32,43 +32,77 @@ class SeatsResource(Resource):
         if errors:
            return errors, 422
        
-        # is this a valid ticket?
-        if "ticketnumber" in seat_postdata:
-            ticket = Ticket.query.filter_by(number=seat_postdata['ticketnumber']).first()
-            if not ticket or ticket.status!="valid":
-                return {'message': 'Ticket number does not exist'}, 422
-            seat = Seat.query.filter_by(ticketnumber=seat_postdata['ticketnumber']).first()
-            if seat:
-                return {'message': 'Ticket already booked for a seat'}, 422
+        # input validation
+        if not all (k in seat_postdata for k in ("ticketnumber", "flightnumber", "seatlabel", "seatrow")):
+            return {'error': 'Please provide ticketnumber, flightnumber, seatlabel and seatrow !'}, 404
 
-        # is the seat free / taken (entry with label/row associated to a ticketnumber in Seats)?
-        if "seatlabel" in seat_postdata and "seatrow" in seat_postdata and "ticketnumber" in seat_postdata :
-            seat = Seat.query.filter_by(seatlabel=seat_postdata['seatlabel'], seatrow=seat_postdata['seatrow'], ticketnumber=seat_postdata["ticketnumber"]).first()
-        if seat:
-            return {'message': 'Seat already taken'}, 422   
-        else:
-            seat = Seat.query.filter_by(seatlabel=seat_postdata['seatlabel'], seatrow=seat_postdata['seatrow']).first()
-        if not seat:
-                return {'message': 'Seat does not exist'}, 422
-        else:
-            # seat exists and is not taken yet
-            try:   
+        # is this a valid flight?
+        flight = Flight.query.filter_by(flightnumber=seat_postdata['flightnumber']).first()
+        if not flight:
+            return {'message': 'Flight number does not exist'}, 422
+
+        # is this a valid ticket?
+        ticket = Ticket.query.filter_by(number=seat_postdata['ticketnumber']).first()
+        if not ticket or ticket.status!="valid":
+            return {'message': 'Ticket number does not exist'}, 422
+        
+        try:
+            
+             # is this ticketnumber already booked for a another seat?
+            seat = Seat.query.filter_by(flightnumber=seat_postdata["flightnumber"]).filter_by(ticketnumber=seat_postdata['ticketnumber']).first()
+            if seat:
+                return {'message': 'Ticket already booked for another seat'}, 422
+
+            # is this requested ticketnumber already stored for a seat?
+            seat = Seat.query.filter_by(flightnumber=seat_postdata["flightnumber"]).filter_by(seatlabel=seat_postdata['seatlabel'], seatrow=seat_postdata['seatrow']).filter_by(ticketnumber=seat_postdata['ticketnumber']).first()
+            if seat:
+                return {'message': 'Ticket already booked for requested seat'}, 422
+
+            # is the requested seat already booked by someone else?
+            seat = Seat.query.filter_by(flightnumber=seat_postdata["flightnumber"]).filter_by(seatlabel=seat_postdata['seatlabel'], seatrow=seat_postdata['seatrow']).filter(Seat.ticketnumber != None).first()
+            if seat:
+                return {'message': 'Seat already taken for this flight!'}, 422    
                 
+            # is this a valid seat for this flight? 
+            seat = Seat.query.filter_by(flightnumber=seat_postdata["flightnumber"]).filter_by(seatlabel=seat_postdata['seatlabel'], seatrow=seat_postdata['seatrow']).first()
+            if not seat:
+                return {'message': 'Seat does not exist'}, 422
+            else:
+
+                # seat exists and is not taken yet
+
                 seat.ticketnumber=seat_postdata['ticketnumber']
                 seatcode = seat.ticketnumber+'-'+seat_postdata['seatlabel']+seat_postdata['seatrow']
-                
+
                 # TODO: How can I also enter the seat.id into ticket.seat_id ??
                 ticket.seat_it=seat.id  
-                
-                db.session.commit()
-                
-                # return 200 OK, 201 would be created 
-                return {"Location": '/v1/seat/'+seatcode}, 200
+                db.session.add(ticket)
 
-            except Exception as e:
-                db.session.rollback()
-                print("Exception:" + str(e))
-                return {"Error": 'Exception on seat creation: ' + str(e)}, 400
+                db.session.commit()
+                    
+                # create a notification for seat booking
+                notificationstring = "Seat " + seat.seatlabel + str(seat.seatrow) + " is booked for your ticket " + seat.ticketnumber + "."
+                logging.info(notificationstring)
+                notification = Notification(
+                    title="Seat Booking",
+                    message = notificationstring,
+                    ticketnumber = seat.ticketnumber
+                )
+
+                db.session.add(notification)
+                db.session.commit()
+
+            # return 200 OK, 201 would be created 
+            return {"Location": '/v1/seat/'+seatcode}, 200
+
+        except (sqlalchemy.exc.SQLAlchemyError, sqlalchemy.exc.DBAPIError) as dex:
+            print("Exception:" + str(dex))
+            return {"Error": 'Invalid seatlabel or seatrow selected! (Only A-H for seatlabel and one numeric digit for seatrow allowed)'}, 404
+
+        except Exception as e:
+            db.session.rollback()
+            print("Exception:" + str(e))
+            return {"Error": 'Exception on seat creation: ' + str(e)}, 400
 
 
     @login_required
@@ -105,6 +139,8 @@ class SeatResource(Resource):
                     seat.ticketnumber = None
                     db.session.commit()
                     return {"status": "Successfully cancelled booking of seat"}, 200
+            else:
+                return {"Error": 'Ticketnumber has wrong format. Expecting <Ticketnumber>-<Leatlabel><Seatrow>'}, 404
 
         except Exception as e:
             db.session.rollback()

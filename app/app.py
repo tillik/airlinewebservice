@@ -15,6 +15,7 @@ from resources.Ticket import TicketResource, TicketsResource
 from resources.Seat import SeatResource, SeatsResource
 from resources.User import UserResource
 from resources.Checkin import CheckinResource
+from resources.Notification import NotificationResource
 
 # Read db settings from environment for Azure deployment
 database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}'.format(
@@ -57,6 +58,7 @@ api.add_resource(SeatsResource, '/seat')
 api.add_resource(SeatResource, '/seat/<string:seatcode>')
 api.add_resource(UserResource, '/user')
 api.add_resource(CheckinResource, '/checkin')
+api.add_resource(NotificationResource, '/<string:ticketnumber>/notifications')
 
 # Secret key for signing session cookies 
 app.config['SECRET_KEY'] = 'coolairlinewebservice"'

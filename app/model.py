@@ -14,6 +14,7 @@ from flask_admin.contrib import sqla
 from datetime import datetime
 from wtforms import PasswordField
 
+
 db = SQLAlchemy()
 ma = Marshmallow()
 
@@ -96,15 +97,20 @@ class Ticket(db.Model):
     
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
     number = db.Column(db.String(10),unique=True, nullable=False)
-    flightnumber = db.Column(db.String(10), db.ForeignKey('flights.flightnumber'))
+    flightnumber = db.Column(db.String(10),nullable=False)
     passengername = db.Column(db.String(25),nullable=False)
     passportnumber = db.Column(db.String(10),nullable=False)
     status = db.Column(db.Enum('valid','cancelled',name="ticketstatusenum", create_type=True), nullable=False)
     seat_id = db.Column(db.Integer, db.ForeignKey('seats.id'))
 
+    # generate random ticketnumbers (roughly 36^8 possible combinations with 8 digits)
+    def idgenerator(self, size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
+
     def __init__(self, flightnumber, passengername, passportnumber):
-        # use first seven chars of passport to create the ticketnumber
-        self.number = passportnumber[0:7]
+        # do not use first seven chars of passport to create the ticketnumber: prevents booking after cancellation
+        # self.number = passportnumber[0:7]
+        self.number = self.idgenerator(8)
         self.flightnumber = flightnumber
         self.passengername = passengername
         self.passportnumber = passportnumber
@@ -157,23 +163,26 @@ class Notification(db.Model):
     __tablename__ = 'notifications'
 
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    ticketnumber = db.Column(db.String(10), nullable=False)
     title = db.Column(db.String(250), nullable=False)
     message = db.Column(db.String(250), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    def __init__(self, title, message):
+    def __init__(self, title, message, ticketnumber):
         # use first seven chars of passport to create the ticketnumber
         self.title = title
         self.message = message
+        self.ticketnumber = ticketnumber
 
 # schema forserialization / serialization of flights
 class NotificationSchema(ma.Schema):
+    class Meta:
+        ordered = True
+
+    title = fields.String(required=True, validate=validate.Length(1))
+    message = fields.String(required=True, validate=validate.Length(1))
+    timestamp = fields.DateTime(required=True)
     
-    title = fields.String()
-    message = fields.String()
-    timestamp = fields.DateTime()
-
-
 class Flight(db.Model):
     __tablename__ = 'flights'
 

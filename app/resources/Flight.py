@@ -4,7 +4,7 @@ from flask import request, json,jsonify, session
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
+from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 from sqlalchemy import exc
 from marshmallow import fields, pprint
 
@@ -125,7 +125,7 @@ class FlightResource(Resource):
         #return {json.dumps(result)}, 200
         return {'error': 'Missing flightnumber in request'}, 400
 
-     # Delete a flight by flightnumber
+     # Delete a flight by flightnumber ("cancelling flight")
     @login_required
     @roles_required('admin')
     def  delete(self, flightnumber):
@@ -140,14 +140,27 @@ class FlightResource(Resource):
                     # flight deletion must: 
                     
                     # a) update existing tickets: 
-                    #       - set invalid
-                    #       - remove seat bookings & flightnumber
+                    #       - set status cancelled
+                    #       - remove seat bookings 
+                    #         (do not unset flightnumber - 
+                    #          or booking new flight with same passportnumber will fail)
                     tickets = Ticket.query.filter_by(flightnumber=flightnumber).all()
                     for ticket in tickets:
                         ticket.status="cancelled"
-                        ticket.flightnumber=None
+                        #ticket.flightnumber=None
                         ticket.seat_id=None
                         db.session.add(ticket)
+
+                        # create notification for each cancelled ticket 
+                        notificationstring = "The flight " + flightnumber + " was canceled"
+                        logging.info(notificationstring)
+                        notification = Notification(
+                            title="Flight canceled",
+                            message = notificationstring,
+                            ticketnumber = ticket.number 
+                        )
+                        db.session.add(notification)
+
                     db.session.commit()
                     
                     # b) update existing seats:
@@ -163,7 +176,8 @@ class FlightResource(Resource):
                     #db.session.delete(seats)
                     db.session.delete(flight)
                     db.session.commit()
-                    return {"status": "Successfully deleted flight and all seats"}, 200
+
+                    return {"status": "Successfully cancelled flight and all seats"}, 200
         except Exception as e:
             db.session.rollback()
             print("Exception:" + str(e))
