@@ -37,7 +37,7 @@ class NotificationResource(Resource):
                 else:
                     return {"status": "No notifications found for ticketnumber " + ticketnumber}, 200
             else:
-                return {"Error": "Please specifiy a 7digit-ticketnumber !"}, 404    
+                return {"Error": "Please specifiy a 7digit-ticketnumber containing only alphanumerical characters!"}, 404    
 
         else:
             return {"Error": "No ticketnumber specified !"}, 404

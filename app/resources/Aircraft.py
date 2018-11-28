@@ -32,9 +32,10 @@ class AircraftsResource(Resource):
         if not json_data:
                return {'message': 'No input data provided'}, 400
         
-        if not 'aircraft' in json_data:
-            return {"success": False, "msg": "must specify aircraft in request"}, 400
-
+        # input validation
+        if not all (k in json_data for k in ("aircraft", "seatcount")):
+            return {'error': 'Please provide aircraft and seatcount!'}, 404
+        
         # validate & deserialize input
         data, errors = aircraft_schema.load(json_data)
         if errors:

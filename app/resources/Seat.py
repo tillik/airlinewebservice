@@ -131,9 +131,13 @@ class SeatResource(Resource):
                 seatrow = parts[2][-1]
                 
                 seat = Seat.query.filter_by(ticketnumber=ticketnumber).first()
+                if not seat:
+                    return {'message': 'No seat booked for ticketnumber ' + str(ticketnumber)}, 422
+
+                seat = Seat.query.filter_by(ticketnumber=ticketnumber).filter_by(seatlabel=seatlabel).filter_by(seatrow=seatrow).first()
                 
                 if not seat:
-                    return {'message': 'No seat booked for ticket'}, 422
+                    return {'message': 'Seat ' + str(seatlabel) + str(seatrow) + ' not booked for ticket ' + str(ticketnumber)}, 422
                 else:
                     #update the seats for the flight by removing the ticketnumber from the entries
                     seat.ticketnumber = None

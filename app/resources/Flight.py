@@ -4,7 +4,7 @@ from flask import request, json,jsonify, session
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
+from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, FlightsSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 from sqlalchemy import exc
 from marshmallow import fields, pprint
 
@@ -24,8 +24,7 @@ class FlightsResource(Resource):
         flights = Flight.query.all()
         
         # dump all using schema
-        # flight_schema_ex = FlightSchema(exclude=['number'])
-        flight_schema_ex = FlightSchema()
+        flight_schema_ex = FlightsSchema()
         return flight_schema_ex.dump(flights, many=True).data
 
     # Create new flight
@@ -42,22 +41,25 @@ class FlightsResource(Resource):
             return errors, 422
         else:
             try:    
-                logging.info('POST add new flight with number=' + json_data['flightnumber'] + \
-                                            ' start=' + json_data['start'] +\
-                                            ' end=' + json_data['end'] +\
-                                            ' departure=' + json_data['departure'] +\
-                                            ' aircraft=' + json_data['aircraft'])
+                
+                # input validation
+                if not all (k in data for k in ("start", "end", "aircraft", "date")):
+                    return {'error': 'Please provide start, end, aircraft and departure!'}, 404
+                
+                logging.info('POST add new flight received values:')
+                for k,v in json_data.items():
+                    logging.info(str(k)+': '  + str(v))
 
-                flight = Flight.query.filter_by(flightnumber=data['flightnumber']).first()
-                if flight:
-                    return {'message': 'Flightnumber already exists'}, 400
+                #flight = Flight.query.filter_by(flightnumber=data['flightnumber']).first()
+                #if flight:
+                #    return {'message': 'Flightnumber already exists'}, 400
 
                 aircraft = Aircraft.query.filter_by(aircraft=data['aircraft']).first()
                 if not aircraft:
                     return {'message': 'Aircraft does not exist'}, 400
 
                 flight = Flight(
-                    flightnumber=json_data['flightnumber'],
+                    #flightnumber=json_data['flightnumber'],
                     start=json_data['start'],
                     end=json_data['end'],
                     date=json_data['departure'],

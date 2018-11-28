@@ -35,6 +35,11 @@ class CheckinResource(Resource):
         ticket = None
 
         try:
+
+            # input validation
+            if not all (k in json_data for k in ("ticket-number", "flight-number")):
+                return {'error': 'Please provide ticket-number and flight-number!'}, 404
+
             # retrieve ticket & flight for request
             if "ticket-number" in json_data and "flight-number" in json_data:
 

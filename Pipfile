@@ -17,6 +17,7 @@ flask-security = "*"
 wtforms = "*"
 flask-admin = "*"
 flask-login = "*"
+flask-api = "*"
 
 [dev-packages]
 

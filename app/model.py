@@ -1,6 +1,6 @@
 import random, string, logging
 from flask import Flask
-from marshmallow import Schema, fields, pre_load, post_load, validate
+from marshmallow import Schema, fields, pre_load, post_load, post_dump, validate
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import UserMixin, RoleMixin, login_required, utils
@@ -103,14 +103,11 @@ class Ticket(db.Model):
     status = db.Column(db.Enum('valid','cancelled',name="ticketstatusenum", create_type=True), nullable=False)
     seat_id = db.Column(db.Integer, db.ForeignKey('seats.id'))
 
-    # generate random ticketnumbers (roughly 36^8 possible combinations with 8 digits)
-    def idgenerator(self, size=6, chars=string.ascii_uppercase + string.digits):
+    def idgenerator(self, size=7, chars=string.ascii_uppercase + string.digits):
         return ''.join(random.choice(chars) for _ in range(size))
 
     def __init__(self, flightnumber, passengername, passportnumber):
-        # do not use first seven chars of passport to create the ticketnumber: prevents booking after cancellation
-        # self.number = passportnumber[0:7]
-        self.number = self.idgenerator(8)
+        self.number = self.idgenerator(7, string.ascii_uppercase + string.digits)
         self.flightnumber = flightnumber
         self.passengername = passengername
         self.passportnumber = passportnumber
@@ -190,7 +187,7 @@ class Flight(db.Model):
     
     # define one:many parent/child relationship
     # one way: 
-    #seats = relationship("Seat", cascade="all,delete", backref="parent")
+    # seats = relationship("Seat", cascade="all,delete", backref="parent")
     seats = db.relationship("Seat", back_populates="flight")
 
     flightnumber = db.Column(db.String(10), unique=True, nullable=False)
@@ -200,38 +197,49 @@ class Flight(db.Model):
     aircraft  = db.Column(db.String(15), db.ForeignKey('aircrafts.aircraft'), nullable=False)
     status = db.Column(db.Enum('valid','cancelled',name="ticketstatusenum", create_type=True), nullable=False)
     
-  
-    
-    def __init__(self, flightnumber, start, end, date, aircraft):
-        self.flightnumber = flightnumber
+    def idgenerator(self, size=6, chars=string.ascii_uppercase + string.digits):
+            return ''.join(random.choice(chars) for _ in range(size))
+
+    def __init__(self, start, end, date, aircraft):
+        self.flightnumber = self.idgenerator(6, string.ascii_uppercase + string.digits)
         self.start = start
         self.end = end
         self.date = date
         self.aircraft = aircraft
         self.status = "valid"
 
-    # get status 
-    #@hybrid_property
-    #def status(self):
-    #   return self.status
-
-    # set status
-    #@status.setter
-    #def status(self, status):
-    #   self.status = status
-
 # schema for serialization / serialization of flights
 class FlightSchema(ma.Schema):
-    id = fields.Integer()
+    class Meta:
+        ordered = True
+    
+    #id = fields.Integer()
+    #flightnumber = fields.String(required=True, validate=validate.Length(1))
+    start = fields.String(required=True, validate=validate.Length(1))
+    end = fields.String(required=True, validate=validate.Length(1))
+    departure = fields.DateTime(required=True, attribute="date")
+    aircraft = fields.String(required=True, validate=validate.Length(1))
+
+# schema for serialization / serialization of a single flight
+class FlightsSchema(ma.Schema):
+    class Meta:
+        ordered = True
+    
     flightnumber = fields.String(required=True, validate=validate.Length(1))
-    start = fields.String()
-    end = fields.String()
-    date = fields.DateTime()
-    aircraft = fields.String()
+    start = fields.String(required=True)
+    end = fields.String(required=True)
+    date = fields.DateTime(required=True)
+    aircraft = fields.String(required=True)
     # same value with different encodings. Z and +00:00 are equivalent.
     #departure = fields.DateTime('%Y-%m-%dT%H:%M:%SZ')
     #departure.dateformat("ISO8601")
 
+    @post_dump
+    def flightnumber(self, item):
+        flightnumber = item.get('flightnumber')
+        if flightnumber:
+            item['flight-number'] = item.pop('flightnumber')
+    
 # Create an association table to support a many-to-many relationship between Users and Roles
 roles_users = db.Table(
     'roles_users',
