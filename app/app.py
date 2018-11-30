@@ -7,15 +7,16 @@ from flask_restful import Api
 from flask_migrate import Migrate
 from flask_admin import Admin
 from flask_login import logout_user
-from model import db, User, Role, UserAdmin, RoleAdmin
-from resources.Welcome import Welcome
-from resources.Flight import FlightResource, FlightsResource
-from resources.Aircraft import AircraftResource, AircraftsResource
-from resources.Ticket import TicketResource, TicketsResource
-from resources.Seat import SeatResource, SeatsResource
-from resources.User import UserResource
-from resources.Checkin import CheckinResource
-from resources.Notification import NotificationResource
+from app.model import db, User, Role, UserAdmin, RoleAdmin
+from app.resources.Welcome import Welcome
+from app.resources.Flight import FlightResource, FlightsResource
+from app.resources.Aircraft import AircraftResource, AircraftsResource
+from app.resources.Ticket import TicketResource, TicketsResource
+from app.resources.Seat import SeatResource, SeatsResource
+from app.resources.User import UserResource
+from app.resources.Checkin import CheckinResource
+from app.resources.Notification import NotificationResource
+from app.auth import auth_blueprint
 
 
 def create_app():
@@ -47,6 +48,7 @@ def create_app():
     api = Api(api_bp)
 
     app.register_blueprint(api_bp, url_prefix='/v1')
+    app.register_blueprint(auth_blueprint)
 
     # Routes
     api.add_resource(Welcome, '/welcome')
@@ -60,7 +62,7 @@ def create_app():
     api.add_resource(SeatResource, '/seat/<string:seatcode>')
     api.add_resource(UserResource, '/user')
     api.add_resource(CheckinResource, '/checkin')
-    api.add_resource(NotificationResource, '/<string:ticketnumber>/notifications')
+    api.add_resource(NotificationResource, '/ticket/<string:ticketnumber>/notifications')
 
     # Secret key for signing session cookies 
     app.config['SECRET_KEY'] = 'coolairlinewebservice"'
@@ -115,8 +117,8 @@ def create_app():
         
         except Exception as e:
                 db.session.rollback()
-                print("Exception:" + str(e))
-                return {"Error": 'Exception on before_first_request (the webservice will not be usable!): ' + str(e)}, 400
+                app.logger.info("Exception:" + str(e))
+                return {"message": 'Exception on before_first_request (the webservice will not be usable!): ' + str(e)}, 400
 
     # Displays the home page.
     @app.route('/')

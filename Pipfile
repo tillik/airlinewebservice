@@ -18,6 +18,7 @@ wtforms = "*"
 flask-admin = "*"
 flask-login = "*"
 flask-api = "*"
+pyjwt = "*"
 
 [dev-packages]
 

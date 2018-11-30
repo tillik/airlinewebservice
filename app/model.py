@@ -1,3 +1,4 @@
+import jwt, re
 import random, string, logging
 from flask import Flask
 from marshmallow import Schema, fields, pre_load, post_load, post_dump, validate
@@ -13,6 +14,8 @@ from passlib.apps import custom_app_context as pwd_context
 from flask_admin.contrib import sqla
 from datetime import datetime
 from wtforms import PasswordField
+from datetime import datetime, timedelta
+
 
 
 db = SQLAlchemy()
@@ -95,6 +98,9 @@ class SeatSchema(ma.Schema):
 class Ticket(db.Model):
     __tablename__ = 'tickets'
     
+    # only match 7-digit ticketnumbers like T123456
+    passportpattern = re.compile("^([A-Z0-9]{7})$")
+
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
     number = db.Column(db.String(10),unique=True, nullable=False)
     flightnumber = db.Column(db.String(10),nullable=False)
@@ -106,11 +112,17 @@ class Ticket(db.Model):
     def idgenerator(self, size=7, chars=string.ascii_uppercase + string.digits):
         return ''.join(random.choice(chars) for _ in range(size))
 
+    def validate_passportnumber(self, passportnumber):
+        #TODO: validating here
+        if (str(passportnumber).lower()) == "invalid":
+            raise InvalidPassport('Thepassportnumber ' + str(passportnumber) + 'is invalid', status_code=410)
+        return passportnumber
+
     def __init__(self, flightnumber, passengername, passportnumber):
         self.number = self.idgenerator(7, string.ascii_uppercase + string.digits)
         self.flightnumber = flightnumber
         self.passengername = passengername
-        self.passportnumber = passportnumber
+        self.passportnumber = self.validate_passportnumber(passportnumber)
         self.status = "valid"
 
     # TODO:  Add a column-property for returning the "full" ticketnumber <number>-<seatlabelseatrow> when seat is booked?
@@ -152,7 +164,7 @@ class TicketSchema(ma.Schema):
 
     # raise a custom exception when (de)serialization fails
     def handle_error(self, exc, data):
-        logging.error(exc.messages)
+        logging.error("ERROR when serializing ticket: " + exc.messages)
         raise AppError('An error occurred with input: {0}'.format(data))
 
 # table storing all notifications for transactions
@@ -208,16 +220,17 @@ class Flight(db.Model):
         self.aircraft = aircraft
         self.status = "valid"
 
-# schema for serialization / serialization of flights
+# schema for serialization / serialization of a single flight
+# (flightnumber not mandatory on creation of new flight)
 class FlightSchema(ma.Schema):
     class Meta:
         ordered = True
     
     #id = fields.Integer()
-    #flightnumber = fields.String(required=True, validate=validate.Length(1))
+    flightnumber = fields.String(dump_to='flight-number')
     start = fields.String(required=True, validate=validate.Length(1))
     end = fields.String(required=True, validate=validate.Length(1))
-    departure = fields.DateTime(required=True, attribute="date")
+    departure = fields.DateTime(required=True, attribute="date", dump_to='date')
     aircraft = fields.String(required=True, validate=validate.Length(1))
 
 # schema for serialization / serialization of a single flight
@@ -225,28 +238,22 @@ class FlightsSchema(ma.Schema):
     class Meta:
         ordered = True
     
-    flightnumber = fields.String(required=True, validate=validate.Length(1))
+    flightnumber = fields.String(required=True, validate=validate.Length(1), dump_to='flight-number')
     start = fields.String(required=True)
     end = fields.String(required=True)
-    date = fields.DateTime(required=True)
+    #date = fields.DateTime(required=True)
+    departure = fields.DateTime(required=True, attribute="date", dump_to='date')
     aircraft = fields.String(required=True)
     # same value with different encodings. Z and +00:00 are equivalent.
     #departure = fields.DateTime('%Y-%m-%dT%H:%M:%SZ')
     #departure.dateformat("ISO8601")
 
-    @post_dump
-    def flightnumber(self, item):
-        flightnumber = item.get('flightnumber')
-        if flightnumber:
-            item['flight-number'] = item.pop('flightnumber')
-    
 # Create an association table to support a many-to-many relationship between Users and Roles
 roles_users = db.Table(
     'roles_users',
     db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
     db.Column('role_id', db.Integer(), db.ForeignKey('role.id'))
 )
-
 
 class Role(db.Model, RoleMixin):
     id = db.Column(db.Integer(), primary_key=True)
@@ -287,6 +294,42 @@ class User(db.Model, UserMixin):
 
     def verify_password(self, password):
         return pwd_context.verify(password, self.password_hash)
+
+    def generate_token(self, user_id):
+        # Generates an access token
+
+        try:
+            # set up a payload with an expiration time
+            payload = {
+                'exp': datetime.utcnow() + timedelta(minutes=5),
+                'iat': datetime.utcnow(),
+                'sub': user_id
+            }
+            # create the byte string token using the payload and the SECRET key
+            jwt_string = jwt.encode(
+                payload,
+                current_app.config.get('SECRET'),
+                algorithm='HS256'
+            )
+            return jwt_string
+
+        except Exception as e:
+            # return an error in string format if an exception occurs
+            return str(e)
+
+    @staticmethod
+    def decode_token(token):
+        # Decodes an access token from the Authorization header
+        try:
+            # try to decode the token using our SECRET variable
+            payload = jwt.decode(token, current_app.config.get('SECRET'))
+            return payload['sub']
+        except jwt.ExpiredSignatureError:
+            # the token is expired, return an error string
+            return "Expired token. Please login to get a new token"
+        except jwt.InvalidTokenError:
+            # the token is invalid, return an error string
+            return "Invalid token. Please register or login"
 
 # schema for serialization / serialization of users
 class UserSchema(ma.Schema):
@@ -346,3 +389,18 @@ class RoleAdmin(sqla.ModelView):
 # custom exception
 class AppError(Exception):
     pass
+
+class InvalidPassport(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv

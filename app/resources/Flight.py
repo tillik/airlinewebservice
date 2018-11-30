@@ -4,10 +4,9 @@ from flask import request, json,jsonify, session
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, FlightsSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 from sqlalchemy import exc
 from marshmallow import fields, pprint
-
+from app.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, FlightsSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 
 flights_schema = FlightSchema(many=True)
 flight_schema = FlightSchema()
@@ -26,6 +25,7 @@ class FlightsResource(Resource):
         # dump all using schema
         flight_schema_ex = FlightsSchema()
         return flight_schema_ex.dump(flights, many=True).data
+        
 
     # Create new flight
     @login_required
@@ -36,6 +36,7 @@ class FlightsResource(Resource):
         if not json_data:
             return {'message': 'No input data provided'}, 400
         # Validate & deserialize input
+        flight_schema = FlightSchema()
         data, errors = flight_schema.load(json_data)
         if errors:
             return errors, 422
@@ -44,11 +45,11 @@ class FlightsResource(Resource):
                 
                 # input validation
                 if not all (k in data for k in ("start", "end", "aircraft", "date")):
-                    return {'error': 'Please provide start, end, aircraft and departure!'}, 404
+                    return {'message': 'Please provide start, end, aircraft and departure!'}, 404
                 
                 logging.info('POST add new flight received values:')
                 for k,v in json_data.items():
-                    logging.info(str(k)+': '  + str(v))
+                   logging.info(str(k)+': '  + str(v))
 
                 #flight = Flight.query.filter_by(flightnumber=data['flightnumber']).first()
                 #if flight:
@@ -90,24 +91,23 @@ class FlightsResource(Resource):
                         
                 db.session.commit()
             except (exc.IntegrityError, exc.InvalidRequestError):
-                # handle errors
+                logging.error("ERROR for creating new flight")
+				# handle errors
                 db.session.rollback()
-                return {"Error": 'Exception: foreign key violation ' + str(exc)}, 400
+                return {'message' : 'Exception: foreign key violation ' + str(exc)}, 400
 
             result = flight_schema.dump(flight).data
 
-            # return 200 OK, 201 would be created 
-            # return { "status": 'success', 'data': result }, 200
             # After the flight is created the URL to the GET request of this flight is given as a response
-            return {"status": 'success', "location": '/v1/flight/'+flight.flightnumber}, 200
+            return {"location": '/v1/flight/'+flight.flightnumber}, 200
 
     @login_required
     def put(self):
-         return {"status": 'Not implemented'}, 204
+         return {"message": 'Not implemented'}, 204
 
     @login_required
     def delete(self):
-        return {"status": 'Not implemented'}, 204
+        return {"message": 'Not implemented'}, 204
 
 class FlightResource(Resource):
     
@@ -115,23 +115,27 @@ class FlightResource(Resource):
     @login_required
     @roles_accepted('admin','customer')
     def get(self, flightnumber):
-        print('Current user is: '+ current_user.email, file=sys.stdout)
+        logging.info('Current user is: '+ current_user.email)
         
         if flightnumber:
             #flights = Flight.query.all()
             flight = Flight.query.filter_by(flightnumber=flightnumber).first()
-            result = flight_schema.dump(flight).data
-            response = jsonify(result)
-            response.status_code = 200
-            return response
-        #return {json.dumps(result)}, 200
-        return {'error': 'Missing flightnumber in request'}, 400
+            if flight is None:
+                return {'message': 'No flight found with number ' + str(flightnumber)}, 404
+            else:
+                result = flight_schema.dump(flight).data
+                response = jsonify(result)
+                response.status_code = 200
+                return response
+                #return {json.dumps(result)}, 200
+        else:
+            return {'message': 'Missing flightnumber in request'}, 400
 
      # Delete a flight by flightnumber ("cancelling flight")
     @login_required
     @roles_required('admin')
     def  delete(self, flightnumber):
-        print('Current user is: '+ current_user.email, file=sys.stdout)
+        logging.info('Current user is: '+ current_user.email)
         
         try:
             if flightnumber:
@@ -179,8 +183,8 @@ class FlightResource(Resource):
                     db.session.delete(flight)
                     db.session.commit()
 
-                    return {"status": "Successfully cancelled flight and all seats"}, 200
+                    return {"message": "Successfully cancelled flight and all seats"}, 200
         except Exception as e:
             db.session.rollback()
-            print("Exception:" + str(e))
-            return {"Error": 'Exception on flight deletion: ' + str(e)}, 400
+            logging.info("Exception:" + str(e))
+            return {'message': 'Exception on flight deletion: ' + str(e)}, 400

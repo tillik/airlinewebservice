@@ -1,7 +1,7 @@
 from flask import request, jsonify, url_for, abort, make_response
 from flask_restful import Resource
 from flask_security import login_required
-from model import db, User, UserSchema
+from app.model import db, User, UserSchema
 import sys
 
 users_schema = UserSchema(many=True)
@@ -23,22 +23,22 @@ class UserResource(Resource):
         json_data = request.get_json(force=True)
         
         email=json_data['email']
-        print('Received email: ' + email, file=sys.stdout)
+        logging.info('Received email: ' + email, file=sys.stdout)
         
         # password = request.json.get('password')
         password=json_data['password']
-        print('Received password: ' + password, file=sys.stdout)
+        logging.info('Received password: ' + password, file=sys.stdout)
         
         roles=json_data['roles']
-        #print('Received roles: ' + str(roles), file=sys.stdout)
+        # logging.info('Received roles: ' + str(roles), file=sys.stdout)
         
         if email is None or password is None or roles is None:
-            print('Email or password or role empty in request', file=sys.stdout)
+            logging.info('Email or password or role empty in request', file=sys.stdout)
             #return abort (400) # missing arguments
             return make_response(jsonify(error="email or passwort empty in request"), 400)
        
         if User.query.filter_by(email = email).first() is not None:
-            print('Email already exists in db: [' + email + ']', file=sys.stdout)
+            logging.info('Email already exists in db: [' + email + ']', file=sys.stdout)
             #return abort(400) # existing user
             return make_response(jsonify(error="email already in database"), 400)
         

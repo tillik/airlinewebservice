@@ -4,7 +4,7 @@ from flask import request, jsonify
 from flask_restful import Resource
 from flask_security import login_required
 from flask_login import current_user
-from model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
+from app.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 
 seat_schema = SeatSchema(many=True)
 seat_schema = SeatSchema()
@@ -96,12 +96,12 @@ class SeatsResource(Resource):
             return {"Location": '/v1/seat/'+seatcode}, 200
 
         except (sqlalchemy.exc.SQLAlchemyError, sqlalchemy.exc.DBAPIError) as dex:
-            print("Exception:" + str(dex))
+            logging.info("Exception:" + str(dex))
             return {"Error": 'Invalid seatlabel or seatrow selected! (Only A-H for seatlabel and one numeric digit for seatrow allowed)'}, 404
 
         except Exception as e:
             db.session.rollback()
-            print("Exception:" + str(e))
+            logging.info("Exception:" + str(e))
             return {"Error": 'Exception on seat creation: ' + str(e)}, 400
 
 
@@ -116,7 +116,7 @@ class SeatsResource(Resource):
 class SeatResource(Resource):
     @login_required
     def delete(self, seatcode):
-        print('Current user is: '+ current_user.email, file=sys.stdout)
+        logging.info('Current user is: '+ current_user.email)
         
         try:
 
@@ -142,11 +142,11 @@ class SeatResource(Resource):
                     #update the seats for the flight by removing the ticketnumber from the entries
                     seat.ticketnumber = None
                     db.session.commit()
-                    return {"status": "Successfully cancelled booking of seat"}, 200
+                    return {"message": "Successfully cancelled booking of seat"}, 200
             else:
                 return {"Error": 'Ticketnumber has wrong format. Expecting <Ticketnumber>-<Leatlabel><Seatrow>'}, 404
 
         except Exception as e:
             db.session.rollback()
-            print("Exception:" + str(e))
+            logging.info("Exception:" + str(e))
             return {"Error": 'Exception on seat cancellation: ' + str(e)}, 400

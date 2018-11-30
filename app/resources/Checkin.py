@@ -4,10 +4,9 @@ from flask import request, json,jsonify, session
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from model import db, Aircraft, Flight, Seat, Ticket, AircraftSchema, FlightSchema, SeatSchema, TicketSchema
 from sqlalchemy import exc
 from marshmallow import fields, pprint, Schema
-
+from app.model import db, Aircraft, Flight, Seat, Ticket, AircraftSchema, FlightSchema, SeatSchema, TicketSchema
 
 flights_schema = FlightSchema(many=True)
 flight_schema = FlightSchema()
@@ -38,7 +37,7 @@ class CheckinResource(Resource):
 
             # input validation
             if not all (k in json_data for k in ("ticket-number", "flight-number")):
-                return {'error': 'Please provide ticket-number and flight-number!'}, 404
+                return {'message': 'Please provide ticket-number and flight-number!'}, 404
 
             # retrieve ticket & flight for request
             if "ticket-number" in json_data and "flight-number" in json_data:
@@ -47,7 +46,7 @@ class CheckinResource(Resource):
                 flight = Flight.query.filter_by(flightnumber=json_data['flight-number']).first()
 
                 if not ticket is None and not flight is None:
-                    logging.info("Retrieved flight [" + flight.flightnumber + "] and ticket [" + ticket.number  + "]")
+                   logging.info("Retrieved flight [" + flight.flightnumber + "] and ticket [" + ticket.number  + "]")
 
                 if ticket is None:
                     return {'message': 'Ticket does not exist !'}, 400
@@ -93,8 +92,8 @@ class CheckinResource(Resource):
 
         except Exception as e:
                 db.session.rollback()
-                print("Exception:" + str(e))
-                return {"Error": 'Exception on seat creation: ' + str(e)}, 400
+                logging.info("Exception:" + str(e))
+                return {'message' : 'Exception on seat creation: ' + str(e)}, 400
 
 
     @login_required
