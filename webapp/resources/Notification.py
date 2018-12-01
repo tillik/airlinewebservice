@@ -6,7 +6,7 @@ from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
 from sqlalchemy import exc
 from marshmallow import fields, pprint
-from app.model import db, Ticket, TicketSchema, Notification, NotificationSchema
+from webapp.model import db, Ticket, TicketSchema, Notification, NotificationSchema
 
 notifications_schema = NotificationSchema(many=True)
 notification_schema = NotificationSchema()

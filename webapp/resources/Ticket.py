@@ -4,8 +4,8 @@ from flask import request, jsonify
 from flask_restful import Resource
 from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
-from app.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema, InvalidPassport
-import app
+from webapp.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema, InvalidPassport
+import webapp
 
 tickets_schema = TicketSchema(many=True)
 ticket_schema = TicketSchema(partial=True)

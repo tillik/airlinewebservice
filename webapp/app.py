@@ -7,16 +7,16 @@ from flask_restful import Api
 from flask_migrate import Migrate
 from flask_admin import Admin
 from flask_login import logout_user
-from app.model import db, User, Role, UserAdmin, RoleAdmin
-from app.resources.Welcome import Welcome
-from app.resources.Flight import FlightResource, FlightsResource
-from app.resources.Aircraft import AircraftResource, AircraftsResource
-from app.resources.Ticket import TicketResource, TicketsResource
-from app.resources.Seat import SeatResource, SeatsResource
-from app.resources.User import UserResource
-from app.resources.Checkin import CheckinResource
-from app.resources.Notification import NotificationResource
-from app.auth import auth_blueprint
+from webapp.model import db, User, Role, UserAdmin, RoleAdmin
+from webapp.resources.Welcome import Welcome
+from webapp.resources.Flight import FlightResource, FlightsResource
+from webapp.resources.Aircraft import AircraftResource, AircraftsResource
+from webapp.resources.Ticket import TicketResource, TicketsResource
+from webapp.resources.Seat import SeatResource, SeatsResource
+from webapp.resources.User import UserResource
+from webapp.resources.Checkin import CheckinResource
+from webapp.resources.Notification import NotificationResource
+from webapp.auth import auth_blueprint
 
 
 def create_app():

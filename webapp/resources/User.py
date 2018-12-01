@@ -1,7 +1,7 @@
 from flask import request, jsonify, url_for, abort, make_response
 from flask_restful import Resource
 from flask_security import login_required
-from app.model import db, User, UserSchema
+from webapp.model import db, User, UserSchema
 import sys
 
 users_schema = UserSchema(many=True)

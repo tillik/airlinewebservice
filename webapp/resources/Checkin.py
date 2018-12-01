@@ -6,7 +6,7 @@ from flask_security import login_required, roles_required, roles_accepted
 from flask_login import current_user
 from sqlalchemy import exc
 from marshmallow import fields, pprint, Schema
-from app.model import db, Aircraft, Flight, Seat, Ticket, AircraftSchema, FlightSchema, SeatSchema, TicketSchema
+from webapp.model import db, Aircraft, Flight, Seat, Ticket, AircraftSchema, FlightSchema, SeatSchema, TicketSchema
 
 flights_schema = FlightSchema(many=True)
 flight_schema = FlightSchema()

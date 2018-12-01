@@ -4,7 +4,7 @@ from . import auth_blueprint
 
 from flask.views import MethodView
 from flask import make_response, request, jsonify
-from app.model import User
+from webapp.model import User
 
 
 class RegistrationView(MethodView):

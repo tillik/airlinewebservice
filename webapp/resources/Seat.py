@@ -4,7 +4,7 @@ from flask import request, jsonify
 from flask_restful import Resource
 from flask_security import login_required
 from flask_login import current_user
-from app.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
+from webapp.model import db, Aircraft, Flight, AircraftSchema, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema, Notification, NotificationSchema
 
 seat_schema = SeatSchema(many=True)
 seat_schema = SeatSchema()

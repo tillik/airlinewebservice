@@ -1,7 +1,7 @@
 from flask import request, json,jsonify
 from flask_restful import Resource
 from flask_security import login_required
-from app.model import db, Aircraft, AircraftSchema, Flight, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
+from webapp.model import db, Aircraft, AircraftSchema, Flight, FlightSchema, Ticket, TicketSchema, Seat, SeatSchema
 from marshmallow import ValidationError
 import sys
 
